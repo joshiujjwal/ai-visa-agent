@@ -1,0 +1,127 @@
+// prisma/schema.prisma — Database schema for AIVisaAgent
+// After editing this file, run: npx prisma migrate dev --name <migration-name>
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Enums ----
+
+enum ApplicationStatus {
+  draft
+  documents_pending
+  submitted
+  under_review
+  approved
+  rejected
+}
+
+enum VisaType {
+  tourist
+  student
+  work
+  family
+  transit
+  business
+  medical
+}
+
+enum MessageRole {
+  user
+  assistant
+}
+
+// ---- Models ----
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  refreshToken  String?  @map("refresh_token")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  applications VisaApplication[]
+
+  @@map("users")
+}
+
+model VisaApplication {
+  id                    String            @id @default(uuid())
+  userId                String            @map("user_id")
+  destinationCountry    String            @map("destination_country") @db.Char(2)
+  visaType              VisaType          @map("visa_type")
+  applicantNationality  String            @map("applicant_nationality") @db.Char(2)
+  travelDate            DateTime?         @map("travel_date") @db.Date
+  status                ApplicationStatus @default(draft)
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checklistItems   DocumentChecklistItem[]
+  timelineEvents   TimelineEvent[]
+  chatMessages     ChatMessage[]
+
+  @@map("visa_applications")
+}
+
+model DocumentChecklistItem {
+  id            String  @id @default(uuid())
+  applicationId String  @map("application_id")
+  name          String
+  description   String
+  isRequired    Boolean @default(true) @map("is_required")
+  isUploaded    Boolean @default(false) @map("is_uploaded")
+  sortOrder     Int     @default(0) @map("sort_order")
+
+  application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("document_checklist_items")
+}
+
+model TimelineEvent {
+  id            String    @id @default(uuid())
+  applicationId String    @map("application_id")
+  milestone     String
+  estimatedDate DateTime  @map("estimated_date") @db.Date
+  completedAt   DateTime? @map("completed_at")
+  sortOrder     Int       @default(0) @map("sort_order")
+
+  application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("timeline_events")
+}
+
+model CountryRequirement {
+  id              String   @id @default(uuid())
+  countryCode     String   @map("country_code") @db.Char(2)
+  visaType        VisaType @map("visa_type")
+  requiredDocs    Json     @map("required_docs")
+  processingDays  Int      @map("processing_days")
+  feeUsd          Decimal  @map("fee_usd") @db.Decimal(10, 2)
+  embassyUrl      String   @map("embassy_url")
+  notes           String?
+  lastVerifiedAt  DateTime @map("last_verified_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([countryCode, visaType])
+  @@map("country_requirements")
+}
+
+model ChatMessage {
+  id            String      @id @default(uuid())
+  applicationId String      @map("application_id")
+  role          MessageRole
+  content       String
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  application VisaApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}

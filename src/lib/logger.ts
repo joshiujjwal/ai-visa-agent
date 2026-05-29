@@ -1,0 +1,14 @@
+// src/lib/logger.ts
+// Structured JSON logger using Pino.
+// Import this instead of using console.log anywhere.
+
+import pino from 'pino';
+
+export const logger = pino({
+  level: process.env['LOG_LEVEL'] ?? 'info',
+  transport:
+    process.env['NODE_ENV'] !== 'production'
+      ? { target: 'pino-pretty', options: { colorize: true } }
+      : undefined,
+  redact: ['req.headers.authorization', 'body.password', 'body.password_hash'],
+});
